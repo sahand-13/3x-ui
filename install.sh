@@ -783,21 +783,28 @@ config_after_install() {
 }
 
 install_x-ui() {
+    local release_repo="${XUI_RELEASE_REPO:-MHSanaei/3x-ui}"
+    local release_base="https://github.com/${release_repo}/releases/download"
+    local raw_base="https://raw.githubusercontent.com/${release_repo}"
+    if [[ ! "$release_repo" =~ ^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$ ]]; then
+        echo "Invalid XUI_RELEASE_REPO; expected owner/repository." >&2
+        exit 1
+    fi
     cd ${xui_folder%/x-ui}/
     
     # Download resources
     if [ $# == 0 ]; then
-        tag_version=$(curl -Ls "https://api.github.com/repos/MHSanaei/3x-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        tag_version=$(curl -Ls "https://api.github.com/repos/${release_repo}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
         if [[ ! -n "$tag_version" ]]; then
             echo -e "${yellow}Trying to fetch version with IPv4...${plain}"
-            tag_version=$(curl -4 -Ls "https://api.github.com/repos/MHSanaei/3x-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+            tag_version=$(curl -4 -Ls "https://api.github.com/repos/${release_repo}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
             if [[ ! -n "$tag_version" ]]; then
                 echo -e "${red}Failed to fetch x-ui version, it may be due to GitHub API restrictions, please try it later${plain}"
                 exit 1
             fi
         fi
         echo -e "Got x-ui latest version: ${tag_version}, beginning the installation..."
-        curl -4fLRo ${xui_folder}-linux-$(arch).tar.gz https://github.com/MHSanaei/3x-ui/releases/download/${tag_version}/x-ui-linux-$(arch).tar.gz
+        curl -4fLRo "${xui_folder}-linux-$(arch).tar.gz" "${release_base}/${tag_version}/x-ui-linux-$(arch).tar.gz"
         if [[ $? -ne 0 ]]; then
             echo -e "${red}Downloading x-ui failed, please be sure that your server can access GitHub ${plain}"
             exit 1
@@ -812,7 +819,7 @@ install_x-ui() {
             exit 1
         fi
         
-        url="https://github.com/MHSanaei/3x-ui/releases/download/${tag_version}/x-ui-linux-$(arch).tar.gz"
+        url="${release_base}/${tag_version}/x-ui-linux-$(arch).tar.gz"
         echo -e "Beginning to install x-ui $1"
         curl -4fLRo ${xui_folder}-linux-$(arch).tar.gz ${url}
         if [[ $? -ne 0 ]]; then
@@ -820,7 +827,12 @@ install_x-ui() {
             exit 1
         fi
     fi
-    curl -4fLRo /usr/bin/x-ui-temp https://raw.githubusercontent.com/MHSanaei/3x-ui/main/x-ui.sh
+    if [[ -n "${XUI_RELEASE_REPO:-}" ]]; then
+        raw_base="${raw_base}/${tag_version}"
+    else
+        raw_base="${raw_base}/main"
+    fi
+    curl -4fLRo /usr/bin/x-ui-temp "${raw_base}/x-ui.sh"
     if [[ $? -ne 0 ]]; then
         echo -e "${red}Failed to download x-ui.sh${plain}"
         exit 1
@@ -872,7 +884,7 @@ install_x-ui() {
     fi
     
     if [[ $release == "alpine" ]]; then
-        curl -4fLRo /etc/init.d/x-ui https://raw.githubusercontent.com/MHSanaei/3x-ui/main/x-ui.rc
+        curl -4fLRo /etc/init.d/x-ui "${raw_base}/x-ui.rc"
         if [[ $? -ne 0 ]]; then
             echo -e "${red}Failed to download x-ui.rc${plain}"
             exit 1
@@ -929,13 +941,13 @@ install_x-ui() {
             echo -e "${yellow}Service files not found in tar.gz, downloading from GitHub...${plain}"
             case "${release}" in
                 ubuntu | debian | armbian)
-                    curl -4fLRo ${xui_service}/x-ui.service https://raw.githubusercontent.com/MHSanaei/3x-ui/main/x-ui.service.debian >/dev/null 2>&1
+                    curl -4fLRo ${xui_service}/x-ui.service "${raw_base}/x-ui.service.debian" >/dev/null 2>&1
                 ;;
                 arch | manjaro | parch)
-                    curl -4fLRo ${xui_service}/x-ui.service https://raw.githubusercontent.com/MHSanaei/3x-ui/main/x-ui.service.arch >/dev/null 2>&1
+                    curl -4fLRo ${xui_service}/x-ui.service "${raw_base}/x-ui.service.arch" >/dev/null 2>&1
                 ;;
                 *)
-                    curl -4fLRo ${xui_service}/x-ui.service https://raw.githubusercontent.com/MHSanaei/3x-ui/main/x-ui.service.rhel >/dev/null 2>&1
+                    curl -4fLRo ${xui_service}/x-ui.service "${raw_base}/x-ui.service.rhel" >/dev/null 2>&1
                 ;;
             esac
             

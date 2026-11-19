@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ .title }}</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font: 1rem/1.6 system-ui, sans-serif; max-width: 68rem; margin: auto; padding: 1rem; }
+    header, .fields { display: flex; flex-wrap: wrap; align-items: end; gap: .8rem; }
+    header { align-items: center; justify-content: space-between; }
+    section { border: 1px solid GrayText; border-radius: .6rem; margin-block: 1rem; padding: 1rem; }
+    h2 { margin-block-start: 0; }
+    input, select, button { font: inherit; padding: .35rem .5rem; max-width: 100%; }
+    label { display: grid; gap: .2rem; }
+    table { border-collapse: collapse; width: 100%; }
+    td, th { text-align: start; vertical-align: top; padding: .5rem; border-block-end: 1px solid GrayText; }
+    .scroll { overflow-x: auto; }
+    .notice { border-inline-start: .3rem solid; padding-inline-start: .6rem; }
+    .link-field { width: min(25rem, 80vw); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>مدیریت فروشندگان</h1>
+    {{ if .account }}
+    <form method="post" action="{{ .base_path }}resellers/logout">
+      <input type="hidden" name="csrf" value="{{ .csrf }}">
+      <button type="submit">خروج</button>
+    </form>
+    {{ else }}
+    <a href="{{ .base_path }}{{ if .root }}panel/{{ end }}">{{ if .root }}بازگشت به پنل اصلی{{ else }}ورود مدیر اصلی{{ end }}</a>
+    {{ end }}
+  </header>
+  {{ range .notices }}<p class="notice" role="status">{{ . }}</p>{{ end }}
+  {{ if .signed_in }}
+    {{ with .account }}
+    <section>
+      <h2>اعتبار باقی‌مانده: <bdi>{{ .Username }}</bdi></h2>
+      <p>حجم: {{ if .LimitVolume }}{{ .VolumeLeftGiB }} گیبی‌بایت{{ else }}بدون سقف حجمی{{ end }} |
+         تعداد ساخت: {{ if .LimitCount }}{{ .ClientsLeft }} کلاینت{{ else }}بدون سقف تعداد{{ end }}</p>
+    </section>
+    {{ end }}
+    <section>
+      <h2>ساخت کلاینت</h2>
+      {{ if .inbounds }}
+      <form method="post" action="{{ .base_path }}resellers/client" class="fields">
+        <input type="hidden" name="csrf" value="{{ .csrf }}">
+        <label>نام کلاینت<input name="name" maxlength="100" required></label>
+        <label>ورودی
+          <select name="inbound" required>
+            {{ range .inbounds }}<option value="{{ .ID }}">{{ .Remark }} ({{ .Protocol }} #{{ .ID }})</option>{{ end }}
+          </select>
+        </label>
+        <label>حجم کلاینت (GiB)
+          {{ if and .account .account.LimitVolume }}
+          <input name="volume" type="number" min="1" max="{{ .account.VolumeLeftGiB }}" required>
+          {{ else }}
+          <input name="volume" type="number" min="0" placeholder="۰ یعنی نامحدود">
+          {{ end }}
+        </label>
+        <button type="submit">ساخت کلاینت</button>
+      </form>
+      {{ else }}<p>ورودی فعال VLESS، VMess یا Trojan در دسترس نیست.</p>{{ end }}
+    </section>
+    <section>
+      <h2>کلاینت‌های من</h2>
+      {{ if not .subscription }}<p>برای نمایش لینک‌ها، سرویس اشتراک را در تنظیمات پنل اصلی فعال کنید.</p>{{ end }}
+      {{ if .clients }}
+      <div class="scroll"><table>
+        <thead><tr><th>نام</th><th>وضعیت</th><th>مصرف / سقف (GiB)</th><th>اشتراک</th></tr></thead>
+        <tbody>
+        {{ range .clients }}
+          <tr><td>{{ .Name }}</td><td>{{ if .Enable }}فعال{{ else }}غیرفعال{{ end }}</td>
+            <td>{{ printf "%.2f" .UsedGiB }} / {{ if .Total }}{{ .LimitGiB }}{{ else }}نامحدود{{ end }}</td>
+            <td>{{ if $.subscription }}<input class="link-field" aria-label="لینک اشتراک" dir="ltr" readonly value="{{ $.subscription }}{{ .SubID }}">{{ else }}<bdi>{{ .SubID }}</bdi>{{ end }}</td></tr>
+        {{ end }}
+        </tbody>
+      </table></div>
+      {{ else }}<p>هنوز کلاینتی نساخته‌اید.</p>{{ end }}
+    </section>
+    <section>
+      <h2>ایجاد فروشنده زیرمجموعه</h2>
+      <form method="post" action="{{ .base_path }}resellers/child" class="fields">
+        <input type="hidden" name="csrf" value="{{ .csrf }}">
+        <label>نام کاربری<input name="username" dir="ltr" autocomplete="off" pattern="[a-zA-Z0-9_.\-]{3,48}" required></label>
+        <label>گذرواژه<input name="password" type="password" minlength="12" maxlength="72" autocomplete="new-password" required></label>
+        {{ if .root }}
+        <label>نوع سهمیه<select name="mode">
+          <option value="both">حجم و تعداد</option><option value="volume">فقط حجم</option><option value="count">فقط تعداد</option>
+        </select></label>
+        {{ end }}
+        <button type="submit">ایجاد حساب</button>
+      </form>
+    </section>
+    <section>
+      <h2>زیرمجموعه‌های مستقیم و تخصیص اعتبار</h2>
+      {{ if not .root }}<p>سهمیه‌ای که منتقل می‌کنید از اعتبار خودتان کم می‌شود.</p>{{ end }}
+      {{ range .children }}
+      <form method="post" action="{{ $.base_path }}resellers/grant" class="fields">
+        <input type="hidden" name="csrf" value="{{ $.csrf }}">
+        <input type="hidden" name="child" value="{{ .ID }}">
+        <p><bdi><strong>{{ .Username }}</strong></bdi>:
+          {{ if .LimitVolume }}{{ .VolumeLeftGiB }} GiB{{ end }}
+          {{ if .LimitCount }} / {{ .ClientsLeft }} کلاینت{{ end }}</p>
+        {{ if .LimitVolume }}<label>افزایش حجم (GiB)<input name="volume" type="number" min="0"></label>{{ end }}
+        {{ if .LimitCount }}<label>افزایش تعداد<input name="count" type="number" min="0"></label>{{ end }}
+        <button type="submit">تخصیص اعتبار</button>
+      </form>
+      {{ else }}<p>هنوز زیرمجموعه‌ای ندارید.</p>{{ end }}
+    </section>
+  {{ else }}
+    <section>
+      <h2>ورود فروشنده</h2>
+      <form method="post" action="{{ .base_path }}resellers/login" class="fields">
+        <input type="hidden" name="csrf" value="{{ .csrf }}">
+        <label>نام کاربری<input name="username" dir="ltr" autocomplete="username" required></label>
+        <label>گذرواژه<input name="password" type="password" autocomplete="current-password" required></label>
+        <button type="submit">ورود</button>
+      </form>
+    </section>
+  {{ end }}
+</body>
+</html>
