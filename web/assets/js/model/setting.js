@@ -16,6 +16,9 @@ class AllSetting {
         this.tgBotEnable = false;
         this.tgBotToken = "";
         this.tgBotProxy = "";
+        this.tgBotProxyMode = "direct";
+        this.tgBotProxyInbound = 0;
+        this.tgBotProxyOutbound = "";
         this.tgBotAPIServer = "";
         this.tgBotChatId = "";
         this.tgRunTime = "@daily";
@@ -81,6 +84,9 @@ class AllSetting {
             return
         }
         ObjectUtil.cloneProps(this, data);
+        if (!data.tgBotProxyMode) {
+            this.tgBotProxyMode = this.tgBotProxy ? "manual" : "direct";
+        }
     }
 
     equals(other) {

@@ -67,11 +67,40 @@
     </a-collapse-panel>
     <a-collapse-panel key="3" header='{{ i18n "pages.settings.proxyAndServer" }}'>
         <a-setting-list-item paddings="small">
+            <template #title>{{ i18n "pages.settings.telegramProxyMode" }}</template>
+            <template #description>{{ i18n "pages.settings.telegramProxyModeDesc" }}</template>
+            <template #control>
+                <a-select v-model="allSetting.tgBotProxyMode" :style="{ width: '100%' }">
+                    <a-select-option value="direct">{{ i18n "pages.settings.telegramProxyDirect" }}</a-select-option>
+                    <a-select-option value="manual">{{ i18n "pages.settings.telegramProxy" }}</a-select-option>
+                    <a-select-option value="inbound">Xray Inbound</a-select-option>
+                    <a-select-option value="outbound">Xray Outbound</a-select-option>
+                </a-select>
+            </template>
+        </a-setting-list-item>
+        <a-setting-list-item v-if="allSetting.tgBotProxyMode === 'manual'" paddings="small">
             <template #title>{{ i18n "pages.settings.telegramProxy"}}</template>
             <template #description>{{ i18n "pages.settings.telegramProxyDesc"}}</template>
             <template #control>
-                <a-input type="text" placeholder="socks5://user:pass@host:port"
-                    v-model="allSetting.tgBotProxy"></a-input>
+                <a-input-password placeholder="socks5://user:pass@host:port"
+                    autocomplete="off"
+                    v-model="allSetting.tgBotProxy"></a-input-password>
+            </template>
+        </a-setting-list-item>
+        <a-setting-list-item v-if="allSetting.tgBotProxyMode === 'inbound'" paddings="small">
+            <template #title>Xray Inbound</template>
+            <template #description>{{ i18n "pages.settings.telegramProxyInboundDesc" }}</template>
+            <template #control>
+                <a-select v-model="allSetting.tgBotProxyInbound" :options="telegramInboundOptions"
+                    :style="{ width: '100%' }"></a-select>
+            </template>
+        </a-setting-list-item>
+        <a-setting-list-item v-if="allSetting.tgBotProxyMode === 'outbound'" paddings="small">
+            <template #title>Xray Outbound</template>
+            <template #description>{{ i18n "pages.settings.telegramProxyOutboundDesc" }}</template>
+            <template #control>
+                <a-select v-model="allSetting.tgBotProxyOutbound" :options="telegramOutboundOptions"
+                    :style="{ width: '100%' }"></a-select>
             </template>
         </a-setting-list-item>
         <a-setting-list-item paddings="small">

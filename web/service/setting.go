@@ -42,6 +42,9 @@ var defaultValueMap = map[string]string{
 	"tgBotEnable":                 "false",
 	"tgBotToken":                  "",
 	"tgBotProxy":                  "",
+	"tgBotProxyMode":              "",
+	"tgBotProxyInbound":           "0",
+	"tgBotProxyOutbound":          "",
 	"tgBotAPIServer":              "",
 	"tgBotChatId":                 "",
 	"tgRunTime":                   "@daily",
@@ -690,6 +693,9 @@ func (s *SettingService) GetLdapDefaultLimitIP() (int, error) {
 
 func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting) error {
 	if err := allSetting.CheckValid(); err != nil {
+		return err
+	}
+	if err := validateTelegramProxy(s, allSetting); err != nil {
 		return err
 	}
 

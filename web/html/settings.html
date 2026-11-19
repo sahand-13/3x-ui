@@ -127,6 +127,8 @@
       user: {},
       lang: LanguageManager.getLanguage(),
       inboundOptions: [],
+      telegramInboundOptions: [],
+      telegramOutboundOptions: [],
       remarkModels: { i: 'Inbound', e: 'Email', o: 'Other' },
       remarkSeparators: [' ', '-', '_', '@', ':', '~', '|', ',', '.', '/'],
       datepickerList: [{ name: 'Gregorian (Standard)', value: 'gregorian' }, { name: 'Jalalian (شمسی)', value: 'jalalian' }],
@@ -283,8 +285,25 @@
             label: `${ib.tag} (${ib.protocol}@${ib.port})`,
             value: ib.tag,
           }));
+          this.telegramInboundOptions = msg.obj
+            .filter(ib => ib.enable && ['socks', 'mixed'].includes(ib.protocol))
+            .map(ib => ({
+              label: `${ib.remark || ib.tag} (${ib.protocol}@${ib.port})`,
+              value: ib.id,
+            }));
         } else {
           this.inboundOptions = [];
+          this.telegramInboundOptions = [];
+        }
+      },
+      async loadTelegramOutbounds() {
+        const msg = await HttpUtil.post("/panel/xray/");
+        if (msg && msg.success) {
+          const { xraySetting } = JSON.parse(msg.obj);
+          const outbounds = xraySetting?.outbounds;
+          this.telegramOutboundOptions = (Array.isArray(outbounds) ? outbounds : [])
+            .filter(outbound => outbound.tag)
+            .map(outbound => ({ label: `${outbound.tag} (${outbound.protocol})`, value: outbound.tag }));
         }
       },
       async updateAllSetting() {
@@ -627,7 +646,7 @@
       this.entryProtocol = window.location.protocol;
       this.entryIsIP = this._isIp(this.entryHost);
       await this.getAllSetting();
-      await this.loadInboundTags();
+      await Promise.allSettled([this.loadInboundTags(), this.loadTelegramOutbounds()]);
       while (true) {
         await PromiseUtil.sleep(1000);
         this.saveBtnDisable = this.oldAllSetting.equals(this.allSetting);

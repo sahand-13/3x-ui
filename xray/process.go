@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"os/exec"
 	"runtime"
@@ -258,7 +257,11 @@ func (p *process) Start() (err error) {
 	if p.configPath != "" {
 		configPath = p.configPath
 	}
-	err = os.WriteFile(configPath, data, fs.ModePerm)
+	// Generated configuration can contain proxy credentials.
+	if err = os.Chmod(configPath, 0o600); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return common.NewErrorf("Failed to restrict configuration file permissions: %v", err)
+	}
+	err = os.WriteFile(configPath, data, 0o600)
 	if err != nil {
 		return common.NewErrorf("Failed to write configuration file: %v", err)
 	}

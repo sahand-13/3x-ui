@@ -37,7 +37,7 @@ import (
 	tu "github.com/mymmrac/telego/telegoutil"
 	"github.com/skip2/go-qrcode"
 	"github.com/valyala/fasthttp"
-	"github.com/valyala/fasthttp/fasthttpproxy"
+	"golang.org/x/net/proxy"
 )
 
 var (
@@ -231,9 +231,10 @@ func (t *Tgbot) Start(i18nFS embed.FS) error {
 	tgBotMutex.Unlock()
 
 	// Get Telegram bot proxy URL
-	tgBotProxy, err := t.settingService.GetTgBotProxy()
+	tgBotProxy, err := t.settingService.telegramBotProxy()
 	if err != nil {
-		logger.Warning("Failed to get Telegram bot proxy URL:", err)
+		logger.Warning("Failed to resolve Telegram bot proxy:", err)
+		return err
 	}
 
 	// Get Telegram bot API server URL
@@ -275,7 +276,7 @@ func (t *Tgbot) Start(i18nFS embed.FS) error {
 }
 
 // createRobustFastHTTPClient creates a fasthttp.Client with proper connection handling
-func (t *Tgbot) createRobustFastHTTPClient(proxyUrl string) *fasthttp.Client {
+func (t *Tgbot) createRobustFastHTTPClient(proxyURL *url.URL) (*fasthttp.Client, error) {
 	client := &fasthttp.Client{
 		// Connection timeouts
 		ReadTimeout:                   30 * time.Second,
@@ -297,26 +298,33 @@ func (t *Tgbot) createRobustFastHTTPClient(proxyUrl string) *fasthttp.Client {
 	}
 
 	// Set proxy if provided
-	if proxyUrl != "" {
-		client.Dial = fasthttpproxy.FasthttpSocksDialer(proxyUrl)
+	if proxyURL != nil {
+		dialer, err := proxy.FromURL(proxyURL, &net.Dialer{Timeout: 10 * time.Second})
+		if err != nil {
+			return nil, errors.New("Unable to configure Telegram SOCKS5 proxy")
+		}
+		contextDialer, ok := dialer.(proxy.ContextDialer)
+		if !ok {
+			return nil, errors.New("Telegram SOCKS5 proxy does not support dial timeouts")
+		}
+		client.Dial = func(addr string) (net.Conn, error) {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			return contextDialer.DialContext(ctx, "tcp", addr)
+		}
 	}
 
-	return client
+	return client, nil
 }
 
 // NewBot creates a new Telegram bot instance with optional proxy and API server settings.
 func (t *Tgbot) NewBot(token string, proxyUrl string, apiServerUrl string) (*telego.Bot, error) {
-	// Validate proxy URL if provided
+	var parsedProxy *url.URL
 	if proxyUrl != "" {
-		if !strings.HasPrefix(proxyUrl, "socks5://") {
-			logger.Warning("Invalid socks5 URL, ignoring proxy")
-			proxyUrl = "" // Clear invalid proxy
-		} else {
-			_, err := url.Parse(proxyUrl)
-			if err != nil {
-				logger.Warningf("Can't parse proxy URL, ignoring proxy: %v", err)
-				proxyUrl = ""
-			}
+		var err error
+		parsedProxy, err = parseTelegramProxy(proxyUrl)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -335,7 +343,10 @@ func (t *Tgbot) NewBot(token string, proxyUrl string, apiServerUrl string) (*tel
 	}
 
 	// Create robust fasthttp client
-	client := t.createRobustFastHTTPClient(proxyUrl)
+	client, err := t.createRobustFastHTTPClient(parsedProxy)
+	if err != nil {
+		return nil, err
+	}
 
 	// Build bot options
 	var options []telego.BotOption

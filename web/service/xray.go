@@ -191,6 +191,9 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 		inboundConfig := inbound.GenXrayInboundConfig()
 		xrayConfig.InboundConfigs = append(xrayConfig.InboundConfigs, *inboundConfig)
 	}
+	if err := s.settingService.configureTelegramBridge(xrayConfig); err != nil {
+		logger.Warning("Telegram SOCKS bridge is unavailable:", err)
+	}
 	return xrayConfig, nil
 }
 
